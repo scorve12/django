@@ -123,3 +123,6 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+KAKAO_REST_API_KEY = config('KAKAO_REST_API_KEY')
+KAKAO_REDIRECT_URI = config('KAKAO_REDIRECT_URI')

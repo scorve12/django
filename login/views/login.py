@@ -5,6 +5,10 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from login.serializers import UserRegistrationSerializer
+from django.conf import settings
+from django.http import JsonResponse
+from django.shortcuts import redirect
+from login.models import CustomUser
 
 from login.utils.kakao import get_kakao_user_info, get_or_create_user, generate_tokens_for_user
 
@@ -31,30 +35,73 @@ class UserRegistrationAPI(APIView):
         serializer = UserRegistrationSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            return Response({"message": "로그인에 성공했습니다."}, status=status.HTTP_201_CREATED)
+            return Response({"message": "회원가입에 성공했습니다."}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class KakaoLoginAPI(APIView):
-    def post(self, request, *args, **kwargs):
-        access_token = request.data.get("access_token")
-        if not access_token:
-            return Response({"error": "Access token이 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+def kakao_login(request):
+    client_id = settings.KAKAO_REST_API_KEY
+    redirect_uri = settings.KAKAO_REDIRECT_URI
+    return redirect(
+        f"https://kauth.kakao.com/oauth/authorize?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code"
+    )
+    
+def kakao_callback(request):
+    code = request.GET.get('code')
+    token_request = requests.post(
+        "https://kauth.kakao.com/oauth/token",
+        data={
+            "grant_type": "authorization_code",
+            "client_id": settings.KAKAO_REST_API_KEY,
+            "redirect_uri": settings.KAKAO_REDIRECT_URI,
+            "code": code,
+        },
+    )
+    token_response_json = token_request.json()
+    access_token = token_response_json.get('access_token')
+    
+    # 카카오로부터 사용자 정보 가져오기
+    headers = {"Authorization": f"Bearer {access_token}"}
+    profile_request = requests.get("https://kapi.kakao.com/v2/user/me", headers=headers)
+    profile_json = profile_request.json()
+    
+    # 사용자 정보 파싱
+    kakao_account = profile_json.get('kakao_account')
+    kakao_id = profile_json.get('id')
+    email = kakao_account.get('email')
+    gender = kakao_account.get('gender')
+    age_range = kakao_account.get('age_range')
 
-        kakao_user_info = get_kakao_user_info(access_token)
-        if not kakao_user_info:
-            return Response({"error": "올바르지 않은 Kakao유저입니다."}, status=status.HTTP_400_BAD_REQUEST)
+    # 사용자 생성 또는 업데이트
+    user, created = CustomUser.objects.update_or_create(
+        kakao_id=kakao_id,
+        defaults={
+            'username': kakao_account.get('profile', {}).get('nickname', ''),
+            'email': email,
+            'gender': '남' if gender == 'male' else '여' if gender == 'female' else None,
+            'age': age_range 
+        }
+    )
+    
+    if user:
+        refresh = RefreshToken.for_user(user)
+        return JsonResponse({
+            'status': 'success',
+            'username': user.username,
+            'access_token': str(refresh.access_token),
+            'refresh_token': str(refresh),
+        }, status=status.HTTP_200_OK)
+    else:
+        return JsonResponse({
+            'status': 'error', 
+            'message': '로그인에 실패했습니다.'
+        }, status=status.HTTP_401_UNAUTHORIZED)
 
-        user, created = get_or_create_user(kakao_user_info)
 
-        tokens = generate_tokens_for_user(user)
-
+class UserprofileAPI(APIView):
+    def get(self, request, id):
+        user = request.user      
         return Response({
-            "message": "Login successful",
-            "user": {
-                "id": user.id,
-                "username": user.username,
-                "email": user.email,
-                "nickname": user.first_name,
-            },
-            "tokens": tokens,
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
         }, status=status.HTTP_200_OK)
