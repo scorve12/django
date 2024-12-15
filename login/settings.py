@@ -62,7 +62,7 @@ MIDDLEWARE = [
 
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000', 
-    'https://gotrip-iota.vercel.app/',
+    'https://gotrip-iota.vercel.app',
 ]
 
 ROOT_URLCONF = 'login.urls'
