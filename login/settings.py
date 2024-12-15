@@ -33,7 +33,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
     'http://localhost:8000',
     'https://gotrip-iota.vercel.app',
-    "https://capstone-sigma-sable.vercel.app/"
+    "https://capstone-sigma-sable.vercel.app"
 ]
 CSRF_COOKIE_HTTPONLY = False  # 디버깅 중 쿠키를 쉽게 확인할 수 있도록 False로 설정
 CSRF_COOKIE_SECURE = False  # HTTPS가 아닌 환경에서 CSRF 쿠키 허용
@@ -76,7 +76,7 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
     'http://localhost:8000', 
     'https://gotrip-iota.vercel.app',
-    "https://capstone-sigma-sable.vercel.app/",
+    "https://capstone-sigma-sable.vercel.app",
 ]
 
 # SECURE_SSL_REDIRECT = True 
