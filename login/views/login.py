@@ -61,13 +61,14 @@ def kakao_login(request):
     )
 
 def kakao_callback(request):
-
+    permission_classes = [AllowAny]
     code = request.GET.get('code')
 
     frontend_redirect_url = f"http://localhost:3000/oauth/kakao/callback?code={code}"
     return redirect(frontend_redirect_url)
 
 def get_kakao_token(request):
+    permission_classes = [AllowAny]
     # 1. 전달받은 Authorization Code 가져오기
     code = request.GET.get('code')
     if not code:
