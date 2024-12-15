@@ -29,6 +29,13 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.kakao', 
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:3000',
+    'http://localhost:8000',
+    'https://gotrip-iota.vercel.app',
+]
+
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
