@@ -34,6 +34,8 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',
     'https://gotrip-iota.vercel.app',
 ]
+CSRF_COOKIE_HTTPONLY = False  # 디버깅 중 쿠키를 쉽게 확인할 수 있도록 False로 설정
+CSRF_COOKIE_SECURE = False  # HTTPS가 아닌 환경에서 CSRF 쿠키 허용
 
 
 REST_FRAMEWORK = {
@@ -58,7 +60,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    #'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -67,6 +69,8 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
 ]
 
+CORS_ALLOW_ALL_ORIGINS = True  # 모든 출처 허용 (디버그용)
+CORS_ALLOW_CREDENTIALS = True  # 인증 정보(쿠키, HTTP 인증) 허용
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
     'http://localhost:8000', 
