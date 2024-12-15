@@ -9,5 +9,18 @@ class CustomUser(AbstractUser):
     age = models.PositiveIntegerField(null=True, blank=True) 
     last_login = models.DateTimeField(auto_now=True)
 
+    # 토큰 필드 추가
+    access_token = models.TextField(null=True, blank=True)  # Access 토큰
+    refresh_token = models.TextField(null=True, blank=True)  # Refresh 토큰
+
     def __str__(self):
         return self.username
+
+
+class Trip(models.Model):
+    content = models.TextField()
+    created_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title

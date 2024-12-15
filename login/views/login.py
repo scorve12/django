@@ -9,28 +9,41 @@ from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from login.models import CustomUser
-
-from login.utils.kakao import get_kakao_user_info, get_or_create_user, generate_tokens_for_user
+from rest_framework.permissions import AllowAny
 
 User = get_user_model()
 
 class LoginAPI(APIView):
+    permission_classes = [AllowAny]
+    
     def post(self, request, *args, **kwargs):
         username = request.data.get('username')
         password = request.data.get('password')
+        
+        # 사용자 인증
         user = authenticate(username=username, password=password)
         if user:
+            # 토큰 발급
             refresh = RefreshToken.for_user(user)
+
+            # 토큰 저장
+            user.access_token = str(refresh.access_token)
+            user.refresh_token = str(refresh)
+            user.save()
+
             return Response({
                 'status': 'success',
                 'username': username,
-                'access_token': str(refresh.access_token),
-                'refresh_token': str(refresh),
+                'access': user.access_token,
+                'refresh': user.refresh_token,
             }, status=status.HTTP_200_OK)
         else:
             return Response({'status': 'error', 'message': '로그인에 실패했습니다.'}, status=status.HTTP_401_UNAUTHORIZED)
         
+
 class UserRegistrationAPI(APIView):
+    permission_classes = [AllowAny]
+    
     def post(self, request, *args, **kwargs):
         serializer = UserRegistrationSerializer(data=request.data)
         if serializer.is_valid():
@@ -38,15 +51,21 @@ class UserRegistrationAPI(APIView):
             return Response({"message": "회원가입에 성공했습니다."}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 def kakao_login(request):
+    permission_classes = [AllowAny]
     client_id = settings.KAKAO_REST_API_KEY
     redirect_uri = settings.KAKAO_REDIRECT_URI
     return redirect(
         f"https://kauth.kakao.com/oauth/authorize?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code"
     )
     
+
 def kakao_callback(request):
+    permission_classes = [AllowAny]
     code = request.GET.get('code')
+    
+    # 카카오 토큰 요청
     token_request = requests.post(
         "https://kauth.kakao.com/oauth/token",
         data={
@@ -58,6 +77,7 @@ def kakao_callback(request):
     )
     token_response_json = token_request.json()
     access_token = token_response_json.get('access_token')
+    refresh_token = token_response_json.get('refresh_token')
     
     # 카카오로부터 사용자 정보 가져오기
     headers = {"Authorization": f"Bearer {access_token}"}
@@ -81,14 +101,25 @@ def kakao_callback(request):
             'age': age_range 
         }
     )
-    
+
     if user:
+        # 카카오에서 받은 토큰을 사용자 모델에 저장
         refresh = RefreshToken.for_user(user)
+        
+        user.access_token = refresh.access_token
+        user.refresh_token = refresh
+        user.save()
+
+        # SimpleJWT 토큰 발급
+        
+
         return JsonResponse({
             'status': 'success',
             'username': user.username,
-            'access_token': str(refresh.access_token),
-            'refresh_token': str(refresh),
+            #'access': user.access_token,  # 카카오 access_token
+            #'refresh': user.refresh_token,  # 카카오 refresh_token
+            'access': str(refresh.access_token),  # JWT access_token
+            'refresh': str(refresh),  # JWT refresh_token
         }, status=status.HTTP_200_OK)
     else:
         return JsonResponse({
