@@ -64,7 +64,7 @@ def kakao_callback(request):
     permission_classes = [AllowAny]
     code = request.GET.get('code')
 
-    frontend_redirect_url = f"http://localhost:3000/oauth/kakao/callback?code={code}"
+    frontend_redirect_url = f"https://capstone-sigma-sable.vercel.app/kakao/callback?code={code}"
     return redirect(frontend_redirect_url)
 
 def get_kakao_token(request):
