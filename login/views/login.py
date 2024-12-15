@@ -59,13 +59,21 @@ def kakao_login(request):
     return redirect(
         f"https://kauth.kakao.com/oauth/authorize?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code"
     )
-    
 
 def kakao_callback(request):
-    permission_classes = [AllowAny]
+
     code = request.GET.get('code')
-    
-    # 카카오 토큰 요청
+
+    frontend_redirect_url = f"http://localhost:3000/oauth/kakao/callback?code={code}"
+    return redirect(frontend_redirect_url)
+
+def get_kakao_token(request):
+    # 1. 전달받은 Authorization Code 가져오기
+    code = request.GET.get('code')
+    if not code:
+        return JsonResponse({"error": "코드를 추가하세요"}, status=400)
+
+    # 2. 카카오 서버로 액세스 토큰 요청
     token_request = requests.post(
         "https://kauth.kakao.com/oauth/token",
         data={
@@ -75,57 +83,143 @@ def kakao_callback(request):
             "code": code,
         },
     )
-    token_response_json = token_request.json()
-    access_token = token_response_json.get('access_token')
-    refresh_token = token_response_json.get('refresh_token')
-    
-    # 카카오로부터 사용자 정보 가져오기
+    token_response = token_request.json()
+
+    # 3. 카카오 액세스 토큰 검증
+    access_token = token_response.get('access_token')
+    if not access_token:
+        return JsonResponse({"error": "Failed to get access token."}, status=400)
+
+    # 4. 카카오 사용자 정보 가져오기
     headers = {"Authorization": f"Bearer {access_token}"}
     profile_request = requests.get("https://kapi.kakao.com/v2/user/me", headers=headers)
-    profile_json = profile_request.json()
-    
-    # 사용자 정보 파싱
-    kakao_account = profile_json.get('kakao_account')
-    kakao_id = profile_json.get('id')
+    profile_response = profile_request.json()
+
+    if profile_request.status_code != 200:
+        return JsonResponse({"error": "Failed to fetch user profile."}, status=400)
+
+    # 5. 사용자 정보 파싱
+    kakao_account = profile_response.get('kakao_account', {})
+    kakao_id = profile_response.get('id')
     email = kakao_account.get('email')
     gender = kakao_account.get('gender')
     age_range = kakao_account.get('age_range')
+    nickname = kakao_account.get('profile', {}).get('nickname', '')
 
-    # 사용자 생성 또는 업데이트
+    # 6. 사용자 생성 또는 업데이트
     user, created = CustomUser.objects.update_or_create(
         kakao_id=kakao_id,
         defaults={
-            'username': kakao_account.get('profile', {}).get('nickname', ''),
+            'username': nickname,
             'email': email,
-            'gender': '남' if gender == 'male' else '여' if gender == 'female' else None,
-            'age': age_range 
+            'gender': '남' if gender == 'M' else '여' if gender == 'F' else None,
+            'age': age_range,
         }
     )
 
+    # 7. JWT 토큰 발급
     if user:
-        # 카카오에서 받은 토큰을 사용자 모델에 저장
+        # SimpleJWT 토큰 생성
         refresh = RefreshToken.for_user(user)
-        
-        user.access_token = refresh.access_token
-        user.refresh_token = refresh
+
+        # 사용자 모델에 카카오 액세스 토큰 저장 (선택적)
+        user.access_token = access_token  # 카카오 토큰 저장
         user.save()
 
-        # SimpleJWT 토큰 발급
-        
-
+        # 응답 반환
         return JsonResponse({
             'status': 'success',
             'username': user.username,
-            #'access': user.access_token,  # 카카오 access_token
-            #'refresh': user.refresh_token,  # 카카오 refresh_token
             'access': str(refresh.access_token),  # JWT access_token
             'refresh': str(refresh),  # JWT refresh_token
-        }, status=status.HTTP_200_OK)
-    else:
-        return JsonResponse({
-            'status': 'error', 
-            'message': '로그인에 실패했습니다.'
-        }, status=status.HTTP_401_UNAUTHORIZED)
+        }, status=200)
+
+    # 8. 사용자 생성 실패 시 처리
+    return JsonResponse({
+        'status': 'error',
+        'message': '로그인에 실패했습니다.'
+    }, status=401)
+
+# def get_kakao_token(request):
+#     code = request.POST.get('code')
+
+#     # 카카오로 액세스 토큰 요청
+#     token_request = requests.post(
+#         "https://kauth.kakao.com/oauth/token",
+#         data={
+#             "grant_type": "authorization_code",
+#             "client_id": settings.KAKAO_REST_API_KEY,
+#             "redirect_uri": settings.KAKAO_REDIRECT_URI,
+#             "code": code,
+#         },
+#     )
+#     token_response_json = token_request.json()
+#     return JsonResponse(token_response_json)
+# def kakao_callback(request):
+#     permission_classes = [AllowAny]
+#     code = request.GET.get('code')
+    
+#     # 카카오 토큰 요청
+#     token_request = requests.post(
+#         "https://kauth.kakao.com/oauth/token",
+#         data={
+#             "grant_type": "authorization_code",
+#             "client_id": settings.KAKAO_REST_API_KEY,
+#             "redirect_uri": settings.KAKAO_REDIRECT_URI,
+#             "code": code,
+#         },
+#     )
+#     token_response_json = token_request.json()
+#     access_token = token_response_json.get('access_token')
+#     refresh_token = token_response_json.get('refresh_token')
+    
+#     # 카카오로부터 사용자 정보 가져오기
+#     headers = {"Authorization": f"Bearer {access_token}"}
+#     profile_request = requests.get("https://kapi.kakao.com/v2/user/me", headers=headers)
+#     profile_json = profile_request.json()
+    
+#     # 사용자 정보 파싱
+#     kakao_account = profile_json.get('kakao_account')
+#     kakao_id = profile_json.get('id')
+#     email = kakao_account.get('email')
+#     gender = kakao_account.get('gender')
+#     age_range = kakao_account.get('age_range')
+
+#     # 사용자 생성 또는 업데이트
+#     user, created = CustomUser.objects.update_or_create(
+#         kakao_id=kakao_id,
+#         defaults={
+#             'username': kakao_account.get('profile', {}).get('nickname', ''),
+#             'email': email,
+#             'gender': '남' if gender == 'male' else '여' if gender == 'female' else None,
+#             'age': age_range 
+#         }
+#     )
+
+#     if user:
+#         # 카카오에서 받은 토큰을 사용자 모델에 저장
+#         refresh = RefreshToken.for_user(user)
+        
+#         user.access_token = refresh.access_token
+#         user.refresh_token = refresh
+#         user.save()
+
+#         # SimpleJWT 토큰 발급
+        
+
+#         return JsonResponse({
+#             'status': 'success',
+#             'username': user.username,
+#             #'access': user.access_token,  # 카카오 access_token
+#             #'refresh': user.refresh_token,  # 카카오 refresh_token
+#             'access': str(refresh.access_token),  # JWT access_token
+#             'refresh': str(refresh),  # JWT refresh_token
+#         }, status=status.HTTP_200_OK)
+#     else:
+#         return JsonResponse({
+#             'status': 'error', 
+#             'message': '로그인에 실패했습니다.'
+#         }, status=status.HTTP_401_UNAUTHORIZED)
 
 
 class UserprofileAPI(APIView):
